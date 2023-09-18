@@ -80,10 +80,13 @@ runs:
         ENVIRONMENT_TEMPLATE_FILE: etc/${{ steps.slug.outputs.slug }}/kustomization.yaml
       working-directory: _delivery
       run: |
+        set -x
+        
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
           mkdir -pv "environments/${ENVIRONMENT}"
           envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         fi
+        sleep 1
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
         cat > patch.yaml <<EOF
@@ -97,11 +100,17 @@ runs:
           kind: GitRepository
           name: "${REPOSITORY}"
         EOF
+        sleep 1
         
         # Ensure this patch is included in the environment's kustomization file (but without duplicating it)
         yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        "---------------------------------------------------------------"
+        sleep 1
+        
+        echo "---------------------------------------------------------------"
+        sleep 1
+        
         yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         rm -fv patch.yaml
+        sleep 1
