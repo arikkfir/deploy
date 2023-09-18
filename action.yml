@@ -30,7 +30,7 @@ runs:
         BRANCH: ${{ inputs.branch }}
         TOKEN: ${{ inputs.token }}
       run: |
-        [[ -z "${REPOSITORY}}" ]] && echo "Missing repository input" && exit 1 
+        [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
         [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
         [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
     - id: slug
