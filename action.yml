@@ -70,9 +70,11 @@ runs:
         rm -fv patch.yaml
     - uses: EndBug/add-and-commit@v9
       with:
-        add: _delivery/environments/${{ inputs.environment }}
-        author_name: GitHub Actions
-        author_email: <delivery@kfirs.com>
+        cwd: _delivery
+        add: environments/${{ inputs.environment }}
+#        author_name: GitHub Actions
+#        author_email: <delivery@kfirs.com>
+        #commit: --signoff
         message: |
           ${{ inputs.repository }} deployed to "${{ inputs.environment }}"
           
