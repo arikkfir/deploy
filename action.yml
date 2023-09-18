@@ -16,6 +16,10 @@ inputs:
   token:
     description: GitHub token used to clone the "delivery" repository
     required: true
+outputs:
+  state:
+    description: Deployment result state
+    value: ${{ steps.get-state.outputs.state }}
 runs:
   using: composite
   steps:
@@ -72,12 +76,30 @@ runs:
       with:
         cwd: _delivery
         add: environments/${{ inputs.environment }}
-#        author_name: GitHub Actions
-#        author_email: <delivery@kfirs.com>
-        #commit: --signoff
+        commit: --signoff
         message: |
           deploy(${{ inputs.repository }}): deployment to "${{ inputs.environment }}"
           
           Environment:       ${{ inputs.environment }}
           Source repository: ${{ inputs.repository }}
           Branch:            ${{ inputs.branch }}
+    - id: get-state
+      shell: bash
+      env:
+        REPOSITORY: ${{ inputs.repository }}
+        BRANCH: ${{ inputs.branch }}
+        STATUS: kustomization/greenstar/0f018c4b
+      working-directory: _delivery
+      run: |
+        ACCEPT="Accept: application/vnd.github+json"
+        API_VERSION="X-GitHub-Api-Version: 2022-11-28"
+        TARGET="/repos/arikkfir/${REPOSITORY}/commits/heads/${BRANCH}/statuses"
+        while true; do
+          STATE=$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq ".[] | select(.context==\"${STATUS}\") | .state"
+          if [[ -n "${STATE}" ]]; then
+            break
+          else
+            sleep 5
+          fi
+        done
+        echo "state=${STATE}" >> "$GITHUB_OUTPUT"
