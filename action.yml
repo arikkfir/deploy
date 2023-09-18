@@ -76,6 +76,32 @@ runs:
         REPOSITORY: ${{ inputs.repository }}
         BRANCH: ${{ inputs.branch }}
         ENVIRONMENT: ${{ steps.slug.outputs.slug }}
+        ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ steps.slug.outputs.slug }}/kustomization.yaml
+        ENVIRONMENT_TEMPLATE_FILE: etc/${{ steps.slug.outputs.slug }}/kustomization.yaml
+      working-directory: _delivery
       run: |
-        ls -la
-        ls -la ./_delivery
+        if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
+          mkdir -pv "environments/${ENVIRONMENT}"
+          envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        fi
+        
+        # Create a patch file to replace the branch in the GitRepository object associated with the given repository
+        cat > patch.yaml <<EOF
+        patch: |
+          - op: replace
+            path: /spec/ref/branch
+            value: "${BRANCH}"
+        target:
+          group: source.toolkit.fluxcd.io
+          version: v1
+          kind: GitRepository
+          name: "${REPOSITORY}"
+        EOF
+        
+        # Ensure this patch is included in the environment's kustomization file (but without duplicating it)
+        yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        "---------------------------------------------------------------"
+        yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        rm -fv patch.yaml
