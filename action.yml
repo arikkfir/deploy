@@ -89,27 +89,27 @@ runs:
         sleep 1
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
-        cat > patch.yaml <<EOF
-        patch: |
-          - op: replace
-            path: /spec/ref/branch
-            value: "${BRANCH}"
-        target:
-          group: source.toolkit.fluxcd.io
-          version: v1
-          kind: GitRepository
-          name: "${REPOSITORY}"
+        cat > patches.yaml <<EOF
+        - patch: |
+            - op: replace
+              path: /spec/ref/branch
+              value: "${BRANCH}"
+          target:
+            group: source.toolkit.fluxcd.io
+            version: v1
+            kind: GitRepository
+            name: "${REPOSITORY}"
         EOF
         sleep 1
         
         # Ensure this patch is included in the environment's kustomization file (but without duplicating it)
-        yq e -i '.patches -= load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         sleep 5
         
-        yq e -i '.patches -= load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        yq e -i '.patches += load("patch.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         rm -fv patch.yaml
         sleep 1
