@@ -10,17 +10,12 @@ inputs:
   branch:
     description: The branch being deployed in the source repository
     required: true
+  environment:
+    description: The target environment to deploy to
+    required: true
   token:
     description: GitHub token used to clone the "delivery" repository
     required: true
-outputs:
-  environment:
-    description: |
-      The name of the environment that was deployed to. This is a slugged version of the given branch, but with special
-      characters replaced by dashes ("-") and is also restricted to 30 characters. In the case that the branch name is
-      longer than 30 characters, the environment name will consist of the first 20 characters, followed by a dash ("-"),
-      followed by the last 10 characters.
-    value: ${{ steps.slug.outputs.slug }}
 runs:
   using: composite
   steps:
@@ -28,43 +23,14 @@ runs:
       env:
         REPOSITORY: ${{ inputs.repository }}
         BRANCH: ${{ inputs.branch }}
+        ENVIRONMENT: ${{ inputs.environment }}
         TOKEN: ${{ inputs.token }}
       run: |
         [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
         [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
+        [[ -z "${ENVIRONMENT}" ]] && echo "Missing environment input" && exit 1
         [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
         echo "Required fields are present"
-    - id: slug
-      shell: bash
-      env:
-        BRANCH: ${{ inputs.branch }}
-      run: |
-        # Slug the branch name
-        SLUG=$(echo -n "${BRANCH}" | sed -E 's/[^a-zA-Z0-9]+/-/g' | sed -E 's/^-|-$//g' | tr '[:upper:]' '[:lower:]')
-        
-        # Remove any leading dashes (start with a character)
-        while [[ "${SLUG:0:1}" == "-" ]]; do
-            SLUG="${SLUG:1}"
-        done
-        
-        # Remove any trailing dashes (end with a character)
-        while [[ "${SLUG: -1}" == "-" ]]; do
-            SLUG="${SLUG%-}"
-        done
-        
-        # If slug is empty, replace value with a random string
-        if [[ -z "${SLUG}" ]]; then
-          SLUG="empty-name-$(echo -n $RANDOM | base64 | head -c 20 | sed -E 's/[^a-zA-Z0-9]+/-/g')"
-        fi
-        
-        # If slug is longer than 30 character, take the first 20 and last 10 characters
-        if ((${#SLUG} > 30)); then
-          PREFIX="${SLUG:0:20}"
-          SUFFIX="${SLUG: -10}"
-          SLUG="${PREFIX}-${SUFFIX}"
-        fi
-        
-        echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
     - uses: actions/checkout@v4
       with:
         path: _delivery
@@ -75,9 +41,9 @@ runs:
       env:
         REPOSITORY: ${{ inputs.repository }}
         BRANCH: ${{ inputs.branch }}
-        ENVIRONMENT: ${{ steps.slug.outputs.slug }}
-        ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ steps.slug.outputs.slug }}/kustomization.yaml
-        ENVIRONMENT_TEMPLATE_FILE: etc/${{ steps.slug.outputs.slug }}/kustomization.yaml
+        ENVIRONMENT: ${{ inputs.environment }}
+        ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ inputs.environment }}/kustomization.yaml
+        ENVIRONMENT_TEMPLATE_FILE: etc/${{ inputs.environment }}/kustomization.yaml
       working-directory: _delivery
       run: |
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
@@ -104,12 +70,12 @@ runs:
         rm -fv patch.yaml
     - uses: EndBug/add-and-commit@v9
       with:
-        add: environments/${{ steps.slug.outputs.slug }}
+        add: environments/${{ inputs.environment }}
         author_name: GitHub Actions
         author_email: <delivery@kfirs.com>
         message: |
-          ${{ inputs.repository }} deployed to "${{ steps.slug.outputs.slug }}"
+          ${{ inputs.repository }} deployed to "${{ inputs.environment }}"
           
-          Environment:       ${{ steps.slug.outputs.slug }}
+          Environment:       ${{ inputs.environment }}
           Source repository: ${{ inputs.repository }}
           Branch:            ${{ inputs.branch }}
