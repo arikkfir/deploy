@@ -76,7 +76,7 @@ runs:
 #        author_email: <delivery@kfirs.com>
         #commit: --signoff
         message: |
-          ${{ inputs.repository }} deployed to "${{ inputs.environment }}"
+          deploy(${{ inputs.repository }}): deployment to "${{ inputs.environment }}"
           
           Environment:       ${{ inputs.environment }}
           Source repository: ${{ inputs.repository }}
