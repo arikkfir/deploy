@@ -33,6 +33,7 @@ runs:
         [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
         [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
         [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
+        echo "Required fields are present"
     - id: slug
       shell: bash
       env:
