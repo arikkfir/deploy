@@ -95,7 +95,7 @@ runs:
         API_VERSION="X-GitHub-Api-Version: 2022-11-28"
         TARGET="/repos/arikkfir/${REPOSITORY}/commits/heads/${BRANCH}/statuses"
         while true; do
-          STATE=$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq ".[] | select(.context==\"${STATUS}\") | .state"
+          STATE="$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq ".[] | select(.context==\"${STATUS}\") | .state")"
           if [[ -n "${STATE}" ]]; then
             break
           else
