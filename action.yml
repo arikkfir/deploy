@@ -80,13 +80,10 @@ runs:
         ENVIRONMENT_TEMPLATE_FILE: etc/${{ steps.slug.outputs.slug }}/kustomization.yaml
       working-directory: _delivery
       run: |
-        set -x
-        
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
           mkdir -pv "environments/${ENVIRONMENT}"
           envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         fi
-        sleep 1
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
         cat > patches.yaml <<EOF
@@ -100,16 +97,19 @@ runs:
             kind: GitRepository
             name: "${REPOSITORY}"
         EOF
-        sleep 1
         
         # Ensure this patch is included in the environment's kustomization file (but without duplicating it)
         yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        sleep 5
-        
-        yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        cat "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         rm -fv patch.yaml
-        sleep 1
+    - uses: EndBug/add-and-commit@v9
+      with:
+        add: environments/${{ steps.slug.outputs.slug }}
+        author_name: GitHub Actions
+        author_email: <delivery@kfirs.com>
+        message: |
+          ${{ inputs.repository }} deployed to "${{ steps.slug.outputs.slug }}"
+          
+          Environment:       ${{ steps.slug.outputs.slug }}
+          Source repository: ${{ inputs.repository }}
+          Branch:            ${{ inputs.branch }}
