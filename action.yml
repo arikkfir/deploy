@@ -77,7 +77,7 @@ runs:
         
         # Add repository to the list of repositories monitored by the Flux webhook receiver (if it's missing)
         REPO_MONITORED_EXPR='[{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}] - .spec.resources | length'
-        if [[ "$(yq e "${REPO_MONITORED_EXPR}" platform/flux-webhook/receiver.yaml)" == "0" ]]; then
+        if [[ "$(yq e "${REPO_MONITORED_EXPR}" platform/flux-webhook/receiver.yaml)" == "1" ]]; then
           yq e -i '.spec.resources += [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
           git add platform/flux-webhook/receiver.yaml
         fi
