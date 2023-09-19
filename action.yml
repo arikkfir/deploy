@@ -97,11 +97,17 @@ runs:
         FILTER='.[] | select(.context | test("^kustomization/"+env(REPOSITORY)+"/[a-z0-9]+")) | .state'
         while true; do
           STATE="$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq "${FILTER}")"
-          if [[ -n "${STATE}" ]]; then
-            break
+          if [[ "${STATE}" == "success" ]]; then
+            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' succeeded!"
+            exit 0
+          elif [[ "${STATE}" == "failure" ]]; then
+            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' failed!"
+            exit 1
+          elif [[ "${STATE}" == "pending" ]]; then
+            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' is still pending..."
+            sleep 5
           else
             echo "Waiting for commit status 'kustomization/${REPOSITORY}' on '${BRANCH}'..."
             sleep 5
           fi
         done
-        echo "state=${STATE}" >> "$GITHUB_OUTPUT"
