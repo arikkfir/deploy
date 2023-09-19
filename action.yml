@@ -3,6 +3,7 @@ description: Deploy a repository to a given environment in the "delivery" reposi
 branding:
   icon: bookmark
   color: blue
+
 inputs:
   repository:
     description: The repository being deployed
@@ -16,40 +17,42 @@ inputs:
   token:
     description: GitHub token used to clone the "delivery" repository
     required: true
+
 outputs:
   state:
     description: Deployment result state
-    value: ${{ steps.get-state.outputs.state }}
+    value: ${{ steps.deploy.outputs.state }}
+
 runs:
   using: composite
   steps:
-    - shell: bash
-      env:
-        REPOSITORY: ${{ inputs.repository }}
-        BRANCH: ${{ inputs.branch }}
-        ENVIRONMENT: ${{ inputs.environment }}
-        TOKEN: ${{ inputs.token }}
-      run: |
-        [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
-        [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
-        [[ -z "${ENVIRONMENT}" ]] && echo "Missing environment input" && exit 1
-        [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
-        echo "Required fields are present"
+
     - uses: actions/checkout@v4
       with:
         path: _delivery
         repository: arikkfir/delivery
         token: ${{ inputs.token }}
+
     - id: deploy
-      shell: bash
+      shell: bash -exuo pipefail {0}
       env:
-        REPOSITORY: ${{ inputs.repository }}
         BRANCH: ${{ inputs.branch }}
         ENVIRONMENT: ${{ inputs.environment }}
         ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ inputs.environment }}/kustomization.yaml
         ENVIRONMENT_TEMPLATE_FILE: etc/${{ inputs.environment }}/kustomization.yaml
+        GH_TOKEN: ${{ inputs.token }}
+        REPOSITORY: ${{ inputs.repository }}
+        TOKEN: ${{ inputs.token }}
       working-directory: _delivery
       run: |
+        
+        # Verify inputs
+        [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
+        [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
+        [[ -z "${ENVIRONMENT}" ]] && echo "Missing environment input" && exit 1
+        [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
+        
+        # Ensure repository environment kustomization exists; create it if missing
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
           mkdir -pv "environments/${ENVIRONMENT}"
           envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
@@ -70,31 +73,22 @@ runs:
         EOF
         yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        rm -fv patch.yaml
+        git add "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         
-        # Add environment repositories to Flux webhook receiver
-        yq e '.spec.resources -= [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
-        yq e '.spec.resources += [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
-    - uses: EndBug/add-and-commit@v9
-      with:
-        cwd: _delivery
-        add: environments/${{ inputs.environment }} platform/flux-webhook/receiver.yaml
-        commit: --signoff
-        message: |
-          deploy(${{ inputs.repository }}): deployment to "${{ inputs.environment }}"
-          
-          Environment:       ${{ inputs.environment }}
-          Source repository: ${{ inputs.repository }}
-          Branch:            ${{ inputs.branch }}
-    - id: get-state
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.token }}
-        REPOSITORY: ${{ inputs.repository }}
-        BRANCH: ${{ inputs.branch }}
-        STATUS: kustomization/greenstar/0f018c4b
-      working-directory: _delivery
-      run: |
+        # Add repository to the list of repositories monitored by the Flux webhook receiver (if it's missing)
+        REPO_MONITORED_EXPR='[{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}] - .spec.resources | length'
+        if [[ "$(yq e "${REPO_MONITORED_EXPR}" platform/flux-webhook/receiver.yaml)" == "0" ]]; then
+          yq e -i '.spec.resources += [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
+          git add platform/flux-webhook/receiver.yaml
+        fi
+        
+        # Push changes to delivery repository
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git commit -m "deploy(${REPOSITORY}): deployment to \"${ENVIRONMENT}\"" --signoff
+        git push origin HEAD
+        
+        # Wait for the deployment to complete
         ACCEPT="Accept: application/vnd.github+json"
         API_VERSION="X-GitHub-Api-Version: 2022-11-28"
         TARGET="/repos/arikkfir/${REPOSITORY}/commits/heads/${BRANCH}/statuses"
@@ -104,6 +98,7 @@ runs:
           if [[ -n "${STATE}" ]]; then
             break
           else
+            echo "Waiting for commit status 'kustomization/${REPOSITORY}' on '${BRANCH}'..."
             sleep 5
           fi
         done
