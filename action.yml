@@ -85,8 +85,10 @@ runs:
         # Push changes to delivery repository
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
-        git commit -m "deploy(${REPOSITORY}): deployment to \"${ENVIRONMENT}\"" --signoff
-        git push origin HEAD
+        if [[ -n "$(git status -s --untracked-files=no)" ]]; then
+          git commit -m "deploy(${REPOSITORY}): deployment to \"${ENVIRONMENT}\"" --signoff
+          git push origin HEAD
+        fi
         
         # Wait for the deployment to complete
         ACCEPT="Accept: application/vnd.github+json"
