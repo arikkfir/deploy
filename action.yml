@@ -56,6 +56,7 @@ runs:
         fi
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
+        # Then, ensure this patch is included in the environment's kustomization file (but without duplicating it)
         cat > patches.yaml <<EOF
         - patch: |
             - op: replace
@@ -67,15 +68,17 @@ runs:
             kind: GitRepository
             name: "${REPOSITORY}"
         EOF
-        
-        # Ensure this patch is included in the environment's kustomization file (but without duplicating it)
         yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         rm -fv patch.yaml
+        
+        # Add environment repositories to Flux webhook receiver
+        yq e '.spec.resources -= [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
+        yq e '.spec.resources += [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
     - uses: EndBug/add-and-commit@v9
       with:
         cwd: _delivery
-        add: environments/${{ inputs.environment }}
+        add: environments/${{ inputs.environment }} platform/flux-webhook/receiver.yaml
         commit: --signoff
         message: |
           deploy(${{ inputs.repository }}): deployment to "${{ inputs.environment }}"
