@@ -11,17 +11,15 @@ inputs:
   branch:
     description: The branch being deployed in the source repository
     required: true
+  sha:
+    description: The SHA being deployed from the branch
+    required: true
   environment:
     description: The target environment to deploy to
     required: true
   token:
     description: GitHub token used to clone the "delivery" repository
     required: true
-
-outputs:
-  state:
-    description: Deployment result state
-    value: ${{ steps.deploy.outputs.state }}
 
 runs:
   using: composite
@@ -38,10 +36,12 @@ runs:
       env:
         BRANCH: ${{ inputs.branch }}
         ENVIRONMENT: ${{ inputs.environment }}
+        ENVIRONMENT_DIR: environments/${{ inputs.environment }}
         ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ inputs.environment }}/kustomization.yaml
         ENVIRONMENT_TEMPLATE_FILE: etc/${{ inputs.environment }}/kustomization.yaml
         GH_TOKEN: ${{ inputs.token }}
         REPOSITORY: ${{ inputs.repository }}
+        SHA: ${{ inputs.sha }}
         TOKEN: ${{ inputs.token }}
       working-directory: _delivery
       run: |
@@ -49,17 +49,19 @@ runs:
         # Verify inputs
         [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
         [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
+        [[ -z "${SHA}" ]] && echo "Missing sha input" && exit 1
         [[ -z "${ENVIRONMENT}" ]] && echo "Missing environment input" && exit 1
         [[ -z "${TOKEN}" ]] && echo "Missing token input" && exit 1
         
         # Ensure repository environment kustomization exists; create it if missing
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
-          mkdir -pv "environments/${ENVIRONMENT}"
+          mkdir -pv "${ENVIRONMENT_DIR}"
           envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         fi
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
         # Then, ensure this patch is included in the environment's kustomization file (but without duplicating it)
+        # TODO: only add the patch if it's missing; this will prevent unnecessary reordering of the patches list
         cat > patches.yaml <<EOF
         - patch: |
             - op: replace
