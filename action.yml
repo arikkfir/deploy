@@ -60,26 +60,27 @@ runs:
         fi
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
-        # Then, ensure this patch is included in the environment's kustomization file (but without duplicating it)
-        # TODO: only add the patch if it's missing; this will prevent unnecessary reordering of the patches list
-        cat > patches.yaml <<EOF
-        - patch: |
-            - op: replace
-              path: /spec/ref/branch
-              value: "${BRANCH}"
-          target:
-            group: source.toolkit.fluxcd.io
-            version: v1
-            kind: GitRepository
-            name: "${REPOSITORY}"
+        # Then, add this patch to the environment's kustomization file's patches list, if it's not already there
+        cat > patch-git-repository-${REPOSITORY}.yaml <<EOF
+        patch: |
+          - op: replace
+            path: /spec/ref/branch
+            value: "${BRANCH}"
+        target:
+          group: source.toolkit.fluxcd.io
+          version: v1
+          kind: GitRepository
+          name: "${REPOSITORY}"
         EOF
-        yq e -i '.patches -= load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        yq e -i '.patches += load("patches.yaml")' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-        git add "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        GIT_REPO_KUSTOMIZATION_PATCH_MISSING="$(yq e '[load("patch-git-repository-" + env(REPOSITORY) + ".yaml")] - .patches | length == 1')"
+        if [[ "${GIT_REPO_KUSTOMIZATION_PATCH_MISSING}" == "true" ]]; then
+          yq e -i '.patches += [load("patch-git-repository-" + env{REPOSITORY) + ".yaml")]' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+          git add "${ENVIRONMENT_KUSTOMIZATION_FILE}"
+        fi
         
         # Add repository to the list of repositories monitored by the Flux webhook receiver (if it's missing)
-        REPO_MONITORED_EXPR='[{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}] - .spec.resources | length'
-        if [[ "$(yq e "${REPO_MONITORED_EXPR}" platform/flux-webhook/receiver.yaml)" == "1" ]]; then
+        GIT_REPO_RECEIVER_PATCH_MISSING="$(yq e '[{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}] - .spec.resources | length == 1' platform/flux-webhook/receiver.yaml)"
+        if [[ "${GIT_REPO_RECEIVER_PATCH_MISSING}" == "true" ]]; then
           yq e -i '.spec.resources += [{"kind": "GitRepository","name":env(REPOSITORY),"namespace":env(ENVIRONMENT)}]' platform/flux-webhook/receiver.yaml
           git add platform/flux-webhook/receiver.yaml
         fi
@@ -95,7 +96,7 @@ runs:
         # Wait for the deployment to complete
         ACCEPT="Accept: application/vnd.github+json"
         API_VERSION="X-GitHub-Api-Version: 2022-11-28"
-        TARGET="/repos/arikkfir/${REPOSITORY}/commits/heads/${BRANCH}/statuses"
+        TARGET="/repos/arikkfir/${REPOSITORY}/commits/${SHA}/statuses"
         FILTER='.[] | select(.context | test("^kustomization/"+env(REPOSITORY)+"/[a-z0-9]+")) | .state'
         while true; do
           STATE="$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq "${FILTER}")"
