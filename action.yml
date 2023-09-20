@@ -99,6 +99,7 @@ runs:
           STATE="$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq "${FILTER}")"
           if [[ "${STATE}" == "success" ]]; then
             echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' succeeded!"
+            sleep 10 
             exit 0
           elif [[ "${STATE}" == "failure" ]]; then
             echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' failed!"
