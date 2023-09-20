@@ -43,7 +43,6 @@ runs:
         REPOSITORY: ${{ inputs.repository }}
         SHA: ${{ inputs.sha }}
         TOKEN: ${{ inputs.token }}
-      working-directory: _delivery
       run: |
         
         # Verify inputs
@@ -94,24 +93,20 @@ runs:
         fi
         
         # Wait for the deployment to complete
-        ACCEPT="Accept: application/vnd.github+json"
-        API_VERSION="X-GitHub-Api-Version: 2022-11-28"
         TARGET="/repos/arikkfir/${REPOSITORY}/commits/${SHA}/statuses"
         FILTER='.[] | select(.context | test("^kustomization/"+env(REPOSITORY)+"/[a-z0-9]+")) | .state'
         while true; do
-          STATE="$(gh api -H "${ACCEPT}" -H "${API_VERSION}" "${TARGET}" | yq "${FILTER}")"
-          if [[ "${STATE}" == "success" ]]; then
-            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' succeeded!"
-            sleep 10 
-            exit 0
-          elif [[ "${STATE}" == "failure" ]]; then
-            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' failed!"
-            exit 1
-          elif [[ "${STATE}" == "pending" ]]; then
-            echo "Deployment of 'kustomization/${REPOSITORY}' on '${BRANCH}' is still pending..."
-            sleep 5
-          else
-            echo "Waiting for commit status 'kustomization/${REPOSITORY}' on '${BRANCH}'..."
-            sleep 5
+          STATE="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "${TARGET}" | yq "${FILTER}")"
+          if [[ -n "${STATE}" ]]; then
+            echo "Reconciliation status for commit '${SHA}' of 'kustomization/${REPOSITORY}' is '${STATE}'"
+            if [[ "${STATE}" == "success" ]]; then
+              break
+            fi
           fi
+          sleep 10
         done
+        
+        # Little more pause to make sure environment is fully up
+        sleep 5
+
+      working-directory: _delivery
