@@ -110,4 +110,4 @@ runs:
         
         # Little more pause to make sure environment is fully up
         echo "Safety sleeping for 5sec..."
-        sleep 5
+        sleep 30
