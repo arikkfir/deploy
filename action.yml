@@ -107,7 +107,3 @@ runs:
           echo "Reconciliation status for commit '${SHA}' of 'kustomization/${REPOSITORY}' is NOT  successful; sleeping for 10sec..."
           sleep 10
         done
-        
-        # Little more pause to make sure environment is fully up
-        echo "Safety sleeping for 5sec..."
-        sleep 30
