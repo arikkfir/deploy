@@ -39,7 +39,7 @@ runs:
         ENVIRONMENT: ${{ inputs.environment }}
         ENVIRONMENT_DIR: environments/${{ inputs.environment }}
         ENVIRONMENT_KUSTOMIZATION_FILE: environments/${{ inputs.environment }}/kustomization.yaml
-        ENVIRONMENT_TEMPLATE_FILE: etc/${{ inputs.environment }}/kustomization.yaml
+        ENVIRONMENT_TEMPLATE_FILE: etc/env-kustomization-template.yaml
         GH_TOKEN: ${{ inputs.token }}
         REPOSITORY: ${{ inputs.repository }}
         SHA: ${{ inputs.sha }}
