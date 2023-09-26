@@ -99,11 +99,9 @@ runs:
         FILTER='. | sort_by(.created_at) | reverse | .[0] | select(.context | test("^kustomization/"+env(REPOSITORY)+"/[a-z0-9]+")) | .state'
         while true; do
           STATE="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "${TARGET}" | yq "${FILTER}")"
-          if [[ -n "${STATE}" ]]; then
-            if [[ "${STATE}" == "success" ]]; then
-              echo "Reconciliation status for commit '${SHA}' of 'kustomization/${REPOSITORY}' is successful!"
-              break
-            fi
+          if [[ "${STATE}" == "success" ]]; then
+            echo "Reconciliation status for commit '${SHA}' of 'kustomization/${REPOSITORY}' is successful!"
+            break
           fi
           echo "Reconciliation status for commit '${SHA}' of 'kustomization/${REPOSITORY}' is NOT  successful; sleeping for 10sec..."
           sleep 10
