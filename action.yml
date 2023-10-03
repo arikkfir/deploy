@@ -47,7 +47,7 @@ runs:
       run: |
         
         # Verify inputs
-        [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1 
+        [[ -z "${REPOSITORY}" ]] && echo "Missing repository input" && exit 1
         [[ -z "${BRANCH}" ]] && echo "Missing branch input" && exit 1
         [[ -z "${SHA}" ]] && echo "Missing sha input" && exit 1
         [[ -z "${ENVIRONMENT}" ]] && echo "Missing environment input" && exit 1
@@ -57,7 +57,7 @@ runs:
         if [[ ! -f "${ENVIRONMENT_KUSTOMIZATION_FILE}" ]]; then
           mkdir -pv "${ENVIRONMENT_DIR}"
           envsubst < "${ENVIRONMENT_TEMPLATE_FILE}" > "${ENVIRONMENT_KUSTOMIZATION_FILE}"
-          git add "${ENVIRONMENT_KUSTOMIZATION_FILE}" 
+          git add "${ENVIRONMENT_KUSTOMIZATION_FILE}"
         fi
         
         # Create a patch file to replace the branch in the GitRepository object associated with the given repository
@@ -73,7 +73,7 @@ runs:
           kind: GitRepository
           name: "${REPOSITORY}"
         EOF
-        GIT_REPO_KUSTOMIZATION_PATCH_MISSING="$(yq e '[load("patch-git-repository.yaml")] - .patches | length == 1')"
+        GIT_REPO_KUSTOMIZATION_PATCH_MISSING="$(yq e '[load("patch-git-repository.yaml")] - .patches | length == 1' "${ENVIRONMENT_KUSTOMIZATION_FILE}")"
         if [[ "${GIT_REPO_KUSTOMIZATION_PATCH_MISSING}" == "true" ]]; then
           yq e -i '.patches += [load("patch-git-repository.yaml")]' "${ENVIRONMENT_KUSTOMIZATION_FILE}"
           git add "${ENVIRONMENT_KUSTOMIZATION_FILE}"
